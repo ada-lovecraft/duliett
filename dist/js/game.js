@@ -17,7 +17,7 @@ window.onload = function () {
   } else {
     targetSize = targetHeight;
   }
-  targetSize -= 2;
+  targetSize -= 125;
   gameCanvas.width = targetSize;
   gameCanvas.height = targetSize;
   var margin = (window.innerWidth - targetSize) / 2;
@@ -224,7 +224,6 @@ GameOver.prototype = {
 
   },
   init: function(score, multiplier) {
-    console.log('passed score:', score);
     multiplier += 1;
     
     this.score = score;
@@ -288,7 +287,6 @@ GameOver.prototype = {
         this.scoreTween.onLoop.addOnce(function() {
           this.scoreTween.stop();
           if(this.scoreFinalText.alpha) {
-            console.log('creating new tween');
             var tween = this.game.add.tween(this.scoreFinalText).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
             tween.start();
             tween.onComplete.add(function() {
@@ -296,7 +294,6 @@ GameOver.prototype = {
             }, this);
 
           } else {
-            console.log('skipping tween creation');
             this.game.state.start('play', true, false, this.angle);
           }
         }, this);
@@ -349,9 +346,7 @@ GameOver.prototype = {
     }, this);
     // add a block for the multiplier
     totalBlocks++;
-    console.log('total blocks:', totalBlocks);
     var d = totalBlocks > maxBlocksPerRow ? maxBlocksPerRow : totalBlocks;
-    console.log('d:',d);
     width = Math.ceil(32 / d);
     width = width || 32;
     height = Math.ceil(32 / Math.ceil(totalBlocks / maxBlocksPerRow));
@@ -388,7 +383,6 @@ GameOver.prototype = {
     var y = rows * height;
     var scoreSprite = this.game.make.sprite(- 32 - (width * cols),y,new Primative.createPrimative(this.game, 32 - (width * cols), height, this.multiplierColors[localMult]));
     this.game.add.tween(scoreSprite).to({x: x}, this.obstacleRate, Phaser.Easing.Bounce.Out, true, blocks * this.obstacleRate).onComplete.add(function() {
-      console.log('multiplier done');
       this.multiplierDisplayText.text = 'x' + this.multiplier;
       this.scoreText.text = this.scoreDisplay * this.multiplier;
       this.scoreFinalText.text = 'score:\n' + this.scoreDisplay * this.multiplier;
@@ -435,7 +429,6 @@ Menu.prototype = {
   create: function() {
 
     this.score = 0;
-    console.log('menu');
 
     this.titleText = this.game.add.bitmapText(22,1,'minecraftia','duliett',8);
     this.titleText.tint = 0XCCCCCC;

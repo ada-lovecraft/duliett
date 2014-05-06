@@ -2,6 +2,12 @@ body {
   background-color: #333;
   padding:0px;
   margin: 0px;
+  font-family: 'Helvetica','Arial','sans-serif';
+  color: white;
+}
+
+a {
+  color: #ff4fa6;
 }
 
 #duliet-phaser {

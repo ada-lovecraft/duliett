@@ -15,7 +15,6 @@ Menu.prototype = {
   create: function() {
 
     this.score = 0;
-    console.log('menu');
 
     this.titleText = this.game.add.bitmapText(22,1,'minecraftia','duliett',8);
     this.titleText.tint = 0XCCCCCC;

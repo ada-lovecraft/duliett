@@ -16,7 +16,7 @@ window.onload = function () {
   } else {
     targetSize = targetHeight;
   }
-  targetSize -= 2;
+  targetSize -= 125;
   gameCanvas.width = targetSize;
   gameCanvas.height = targetSize;
   var margin = (window.innerWidth - targetSize) / 2;
