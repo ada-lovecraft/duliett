@@ -2,8 +2,34 @@
 'use strict';
 
 //global variables
+
+var Dualiet;
 window.onload = function () {
-  var game = new Phaser.Game(32, 32, Phaser.CANVAS, 'lowrez-jam');
+  var display = document.getElementById('game-display');
+
+  var gameCanvas = document.createElement('canvas');
+  gameCanvas.setAttribute('id','game-canvas');
+  var targetHeight = Math.floor(window.innerHeight / 32 * 32);
+  var targetWidth = Math.floor(window.innerWidth / 32 * 32);
+  var targetSize = 0;
+  if(targetWidth < targetHeight) {
+    targetSize = targetWidth;
+  } else {
+    targetSize = targetHeight;
+  }
+  targetSize -= 2;
+  gameCanvas.width = targetSize;
+  gameCanvas.height = targetSize;
+  var margin = (window.innerWidth - targetSize) / 2;
+  display.style.marginLeft = margin + 'px';
+  
+  display.appendChild(gameCanvas);
+
+  var gameContext = gameCanvas.getContext('2d');
+  Phaser.Canvas.setSmoothingEnabled(gameContext);   
+
+
+  var game = new Phaser.Game(32, 32, Phaser.CANVAS, 'duliet-phaser');
 
   // Game States
   game.state.add('boot', require('./states/boot'));
@@ -13,7 +39,17 @@ window.onload = function () {
   game.state.add('preload', require('./states/preload'));
   
 
+  for(var s in game.state.states) {
+    if(game.state.states.hasOwnProperty(s)) {
+      var state = game.state.states[s];
+      state.render = function() {
+        gameContext.drawImage(game.canvas, 0,0, game.width, game.height, 0, 0, gameCanvas.width, gameCanvas.height);
+      }
+    }
+  }
+
   game.state.start('boot');
+  
 };
 },{"./states/boot":5,"./states/gameover":6,"./states/menu":7,"./states/play":8,"./states/preload":9}],2:[function(require,module,exports){
 'use strict';
@@ -139,20 +175,12 @@ function Boot() {
 
 Boot.prototype = {
   preload: function() {
-    this.load.image('preloader', 'assets/preloader.gif');
     
   },
   create: function() {
     this.game.input.maxPointers = 1;
     this.game.state.start('preload');
 
-    this.game.stage.smoothed = false;
-    this.game.scale.maxWidth = 640;
-    this.game.scale.maxHeight = 640;
-
-    //  Then we tell Phaser that we want it to scale up to whatever the browser can handle, but to do it proportionally
-    this.game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
-    this.game.scale.setScreenSize(true);
   }
 };
 
@@ -161,73 +189,262 @@ module.exports = Boot;
 },{}],6:[function(require,module,exports){
 
 'use strict';
-function GameOver() {}
+function GameOver(score) {
+  this.score = score;
+  this.obstacleRate = 857;
+  this.isReady = false;
+  this.radius = 8;
+  this.cx = 16;
+  this.cy = 16;
+  this.scoreDisplay = 0;
+  this.restarting = false;
+
+  this.scoreColors = {
+      128: '#a530ff',
+      64: '#e789ff',
+      32: '#ffc389',
+      16: '#89ff91',
+      8: '#00ccff',
+      4: '#ff4fa6',
+      2: '#feff89',
+      1: 'white'
+    };
+  this.multiplierColors = [
+      '#380078',
+      '#470096',
+      '#5500b4',
+      '#6300d2',
+      '#7000ee'
+    ];
+}
+var Primative = require('../prefabs/primative');
 
 GameOver.prototype = {
   preload: function () {
 
   },
-  create: function () {
-
-    this.titleText = this.game.add.bitmapText(200, 100, 'minecraftia','Game Over\n',64);
+  init: function(score, multiplier) {
+    console.log('passed score:', score);
+    multiplier += 1;
     
-    this.congratsText = this.game.add.bitmapText(320, 200, 'minecraftia','You win!',32);
+    this.score = score;
+    this.scoreDisplay = 0;
+    this.multiplier = multiplier;
+    this.angle = 0;
+    this.isReady = false;
+    this.restarting = false;
+    
+  },
+  create: function () {
+    this.game.stage.backgroundColor = '#999';
 
-    this.instructionText = this.game.add.bitmapText(330, 300, 'minecraftia','Tap to play again!',12);
+    var red = Primative.createPrimative(this.game, 2, 2, '#ff4fa6');
+    var blue = Primative.createPrimative(this.game, 2,2, '#00ccff');
+    
+
+    
+    this.scoreSprites = this.game.add.group();
+    
+    
+    
+    this.scoreDisplayText = this.game.add.bitmapText(2,2,'minecraftia-dark','' + this.scoreDisplay,8);
+    this.scoreDisplayText.align = 'center';
+    this.scoreDisplayText.alpha = 0;
+    this.multiplierDisplayText = this.game.add.bitmapText(2,12,'minecraftia-dark','',8);
+    this.multiplierDisplayText.align = 'center';
+    this.scoreText = this.game.add.bitmapText(2,22,'minecraftia-dark','',8);
+    this.scoreText.align = 'center';
+    this.scoreText.alpha = 0;
+
+    this.scoreFinalText = this.game.add.bitmapText(0,4,'minecraftia','' + this.scoreDisplay,8);
+    this.scoreFinalText.align = 'center';
+    this.scoreFinalText.alpha = 0;
+
+    this.sprites = this.game.add.group();
+    this.redSprite = this.game.add.sprite(16,16, red);
+    this.redSprite.anchor.setTo(0.5, 0.5);
+    this.blueSprite = this.game.add.sprite(16,16, blue);
+    this.blueSprite.anchor.setTo(0.5, 0.5);
+
+    this.sprites.add(this.redSprite);
+    this.sprites.add(this.blueSprite);
+    this.sprites.alpha = 0;
+
+
+    this.cursors = this.game.input.keyboard.createCursorKeys();
+    
+
+    
+
+
+   
+   this.showScore();
     
   },
   update: function () {
-    if(this.game.input.activePointer.justPressed()) {
-      this.game.state.start('play');
+    if(this.isReady) {
+      if((this.cursors.right.isDown || this.cursors.left.isDown) && !this.restarting) {
+        this.restarting = true;
+        this.scoreTween.onLoop.addOnce(function() {
+          this.scoreTween.stop();
+          if(this.scoreFinalText.alpha) {
+            console.log('creating new tween');
+            var tween = this.game.add.tween(this.scoreFinalText).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
+            tween.start();
+            tween.onComplete.add(function() {
+              this.game.state.start('play', true, false, this.angle);
+            }, this);
+
+          } else {
+            console.log('skipping tween creation');
+            this.game.state.start('play', true, false, this.angle);
+          }
+        }, this);
+      }
+      if(this.cursors.right.isDown) {
+        this.angle += 0.065;
+      } else if(this.cursors.left.isDown) {
+        this.angle -= 0.065;
+      }
+
+      this.blueSprite.x = this.cx + this.radius * Math.cos(this.angle);
+      this.blueSprite.y = this.cy + this.radius * Math.sin(this.angle);
+
+      this.redSprite.x = this.cx - this.radius * Math.cos(this.angle);
+      this.redSprite.y = this.cy - this.radius * Math.sin(this.angle);
+
+      
     }
+
+  },
+  shutdown: function() {
+    this.sprites.destroy();
+  },
+
+  showScore: function() {
+    var total = this.score;
+    var denoms = Object.keys(this.scoreColors);
+    var blocks = 0;
+    var color = null;
+    var width = 4;
+    var height = 4;
+    var i;
+    var cols = 0;
+    var rows = 0;
+    var totalBlocks = 0;
+    var maxBlocksPerRow = 4;
+    denoms.sort(function(a,b) {
+      return a + b;
+    });
+
+    // count total blocks
+    denoms.forEach(function(c) {
+      if(total >= c) {
+        color = this.scoreColors[c];
+        for(i = 0; i < Math.floor(total / c); i++) {
+          totalBlocks++;
+        }
+        total = total % c;
+      }
+    }, this);
+    // add a block for the multiplier
+    totalBlocks++;
+    console.log('total blocks:', totalBlocks);
+    var d = totalBlocks > maxBlocksPerRow ? maxBlocksPerRow : totalBlocks;
+    console.log('d:',d);
+    width = Math.ceil(32 / d);
+    width = width || 32;
+    height = Math.ceil(32 / Math.ceil(totalBlocks / maxBlocksPerRow));
+
+    // reset total
+    total = this.score;
+
+    denoms.forEach(function(c) {
+      if(total >= c) {
+        color = this.scoreColors[c];
+        for(i = 0; i < Math.floor(total / c); i++) {
+          var x = cols * width;
+          var y = rows * height;
+          var scoreSprite = this.game.make.sprite(-width,y,new Primative.createPrimative(this.game, width, height, color));
+          this.game.add.tween(scoreSprite).to({x: x}, this.obstacleRate, Phaser.Easing.Bounce.Out, true, blocks * this.obstacleRate).onComplete.add(function() {
+            this.scoreDisplay += parseInt(c);
+            this.scoreDisplayText.text = this.scoreDisplay;
+            this.scoreDisplayText.alpha = 1;
+          }, this);
+          this.scoreSprites.add(scoreSprite);
+          cols++;
+          blocks++;
+          if(blocks % 4 === 0) {
+            cols = 0;
+            rows++;
+          }
+        }
+        total = total % c;
+      }
+    }, this);
+    
+    var localMult = this.multiplier > 4 ? 4 : this.multiplier;
+    var x = cols * width;
+    var y = rows * height;
+    var scoreSprite = this.game.make.sprite(- 32 - (width * cols),y,new Primative.createPrimative(this.game, 32 - (width * cols), height, this.multiplierColors[localMult]));
+    this.game.add.tween(scoreSprite).to({x: x}, this.obstacleRate, Phaser.Easing.Bounce.Out, true, blocks * this.obstacleRate).onComplete.add(function() {
+      console.log('multiplier done');
+      this.multiplierDisplayText.text = 'x' + this.multiplier;
+      this.scoreText.text = this.scoreDisplay * this.multiplier;
+      this.scoreFinalText.text = 'score:\n' + this.scoreDisplay * this.multiplier;
+      
+    }, this);
+
+    blocks++;
+    blocks++;
+    this.game.add.tween(this.scoreText).to({alpha: 1}, this.obstacleRate, Phaser.Easing.Linear.NONE, true, blocks * this.obstacleRate).onComplete.add(function() {
+      this.fade();
+    }, this);
+    this.scoreSprites.add(scoreSprite);
+    
+  },
+  fade: function() {
+    this.game.add.tween(this.scoreSprites).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE, true, this.obstacleRate);
+    this.game.add.tween(this.scoreText).to({alpha: 0}, this.obstacleRate * 2,Phaser.Easing.Linear.NONE, true, this.obstacleRate);
+    this.scoreTween = this.game.add.tween(this.scoreFinalText).to({alpha:1}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE, false, this.obstacleRate, Infinity, true);
+    this.scoreTween.start();
+    this.scoreTween.onLoop.addOnce(function() {
+      this.isReady = true;
+      this.game.add.tween(this.sprites).to({alpha: 1}, this.obstacleRate).start();
+    }, this);
   }
+
 };
 module.exports = GameOver;
 
-},{}],7:[function(require,module,exports){
+},{"../prefabs/primative":3}],7:[function(require,module,exports){
 
 'use strict';
-function Menu() {}
+var Menu = function () {
+  this.radius = 8;
+  this.cx = 16;
+  this.cy = 16;
+  this.angle = 0;
+};
 var Primative = require('../prefabs/primative');
-var HorizontalObstacle = require('../prefabs/horizontalObstacle');
-var VerticalObstacle = require('../prefabs/verticalObstacle');
+
 Menu.prototype = {
   preload: function() {
 
   },
   create: function() {
+
     this.score = 0;
     console.log('menu');
 
-    this.titleText = this.game.add.bitmapText(23,0,'minecraftia','dualiet', 8);
+    this.titleText = this.game.add.bitmapText(22,1,'minecraftia','duliett',8);
     this.titleText.tint = 0XCCCCCC;
     this.titleText.angle = 90;
 
-    this.scoreText = this.game.add.bitmapText(0,4,'minecraftia','score:\n' + this.score,8);
-    this.scoreText.align = 'center';
-    this.scoreText.alpha = 0;
-
-    this.countdownText = this.game.add.bitmapText(12,12,'minecraftia','',8);
-    this.countdownText.alpha = 0;
-    
-    this.game.stage.smoothed = false;
-
-    this.game.physics.startSystem(Phaser.Physics.ARCADE);
-
     var red = Primative.createPrimative(this.game, 2, 2, '#ff4fa6');
     var blue = Primative.createPrimative(this.game, 2,2, '#00ccff');
-    var top = Primative.createPrimative(this.game, 32,1, '#cccccc');
-    var bottom = Primative.createPrimative(this.game, 32,1, '#cccccc');
-    var left = Primative.createPrimative(this.game, 1,32, '#cccccc');
-    var right = Primative.createPrimative(this.game, 1,32, '#cccccc');
 
     this.sprites = this.game.add.group();
-    this.sprites.enableBody = true;
-    this.sprites.physicsBodyType = Phaser.Physics.ARCADE;
-
-    this.obstacles = this.game.add.group();
-    this.obstacles.enableBody = true;
-    this.obstacles.physicsBodyType = Phaser.Physics.ARCADE;
 
     this.redSprite = this.game.add.sprite(16,16, red);
     this.redSprite.anchor.setTo(0.5, 0.5);
@@ -237,33 +454,9 @@ Menu.prototype = {
     this.sprites.add(this.redSprite);
     this.sprites.add(this.blueSprite);
 
-    this.leftSprite = this.game.add.sprite(0,0, left);
-    this.rightSprite = this.game.add.sprite(31,0, right);
-    this.topSprite = this.game.add.sprite(0,0, top);
-    this.bottomSprite = this.game.add.sprite(0,31, bottom);
-
-    this.leftSprite.visible = false;
-    this.rightSprite.visible = false;
-    this.topSprite.visible = false;
-    this.bottomSprite.visible = false;
+    
 
     this.cursors = this.game.input.keyboard.createCursorKeys();
-
-    this.obstacleRate = 857;
-    this.obstacleTimer = 0;
-    this.radius = 8;
-    this.cx = 16;
-    this.cy = 16;
-    this.angle = 0;
-    this.started = false;
-    this.showCountdown = false;
-    
-    this.hitsound = this.game.add.audio('hit');
-
-    this.countdown = 3;
-    this.countdowTimer = 0;
-
-    this.gameover = false;
 
     this.titleTween = this.game.add.tween(this.titleText).to({alpha: 0.25}, this.obstacleRate, Phaser.Easing.Linear.NONE, true, 2571, Infinity, true);
     this.music = this.game.add.audio('music');
@@ -273,54 +466,204 @@ Menu.prototype = {
     
   },
   update: function() { 
-    if(!this.gameover) {
-      if(this.cursors.right.isDown) {
-        this.angle += 0.065;
-      }
+    if(this.cursors.right.isDown) {
+      this.angle += 0.065;
+    }
 
-      if(this.cursors.left.isDown) {
-        this.angle -= 0.065;
+    if(this.cursors.left.isDown) {
+      this.angle -= 0.065;
+    }
+
+    this.blueSprite.x = this.cx + this.radius * Math.cos(this.angle);
+    this.blueSprite.y = this.cy + this.radius * Math.sin(this.angle);
+    this.redSprite.x = this.cx - this.radius * Math.cos(this.angle);
+    this.redSprite.y = this.cy - this.radius * Math.sin(this.angle);
+
+
+    if((this.cursors.right.isDown || this.cursors.left.isDown) && !this.showCountdown) {
+      this.titleTween.onLoop.addOnce(function() {
+        this.titleTween.stop();
+        if(this.titleText.alpha) {
+          this.game.add.tween(this.titleText).to({alpha:0}, this.obstacleRate, Phaser.Easing.Linear.NONE,true).onComplete.add(function(){
+            this.game.state.start('play',true,false, this.angle);
+          }, this);
+        } else {
+          this.game.state.start('play',true,false, this.angle);
+        }
+      }, this);
+    }
+  }
+};
+
+module.exports = Menu;
+
+},{"../prefabs/primative":3}],8:[function(require,module,exports){
+
+  'use strict';
+  function Play() {
+    this.obstacleRate = 857;
+    this.obstacleTimer = Number.MAX_VALUE;
+    this.radius = 8;
+    this.cx = 16;
+    this.cy = 16;
+    this.angle = 0;
+    this.multiplier = 0;
+    this.angleMultiplier = 0;
+    this.angleStart = 0;
+    this.started = false;
+    this.showCountdown = false;
+
+    this.countdown = 3;
+    this.countdownTimer = 0;
+
+    this.scoreBMD = null;
+
+    this.scoreColors = {
+      128: '#a530ff',
+      64: '#e789ff',
+      32: '#ffc389',
+      16: '#89ff91',
+      8: '#00ccff',
+      4: '#ff4fa6',
+      2: '#feff89',
+      1: 'white'
+    };
+    this.multiplierColors = [
+      '#380078',
+      '#470096',
+      '#5500b4',
+      '#6300d2',
+      '#7000ee'
+    ];
+  }
+
+  var Primative = require('../prefabs/primative');
+  var HorizontalObstacle = require('../prefabs/horizontalObstacle');
+  var VerticalObstacle = require('../prefabs/verticalObstacle');
+
+  Play.prototype = {
+    init: function(angle) {
+      this.angle = angle || 0;
+      this.started = false;
+      this.showCountdown = true;
+
+      this.countdown = 3;
+      this.countdownTimer = 0;
+
+      this.gameover = false;
+      this.score = 0;
+      this.angleMultiplier = 0;
+      this.multiplier = 0;
+      if(!this.game.sound._sounds[0].isPlaying) {
+        this.game.sound._sounds[0].play();
       }
+    },
+    create: function() {
+      this.game.physics.startSystem(Phaser.Physics.ARCADE);
+
+      var red = Primative.createPrimative(this.game, 2, 2, '#ff4fa6');
+      var blue = Primative.createPrimative(this.game, 2,2, '#00ccff');
+      var top = Primative.createPrimative(this.game, 32,1, '#cccccc');
+      var bottom = Primative.createPrimative(this.game, 32,1, '#cccccc');
+      var left = Primative.createPrimative(this.game, 1,32, '#cccccc');
+      var right = Primative.createPrimative(this.game, 1,32, '#cccccc');
+      
+      
+      this.multiplierBMD = this.game.make.bitmapData(32,32);
+      this.multiplierboard = this.game.add.sprite(0,0,this.multiplierBMD);
+      this.multiplierboard.alpha = 0.5;
+
+      this.scoreBMD = this.game.make.bitmapData(8,8);
+      this.scoreboard = this.game.add.sprite(16,19, this.scoreBMD);
+      this.scoreboard.anchor.setTo(0.5);
+      this.scoreboard.alpha = 1.0;
+
+      
+
+      this.sprites = this.game.add.group();
+      this.sprites.enableBody = true;
+      this.sprites.physicsBodyType = Phaser.Physics.ARCADE;
+      
+      this.obstacles = this.game.add.group();
+      this.obstacles.enableBody = true;
+      this.obstacles.physicsBodyType = Phaser.Physics.ARCADE;
+
+
+      this.redSprite = this.game.add.sprite(16,16, red);
+      this.redSprite.anchor.setTo(0.5, 0.5);
+      this.blueSprite = this.game.add.sprite(16,16, blue);
+      this.blueSprite.anchor.setTo(0.5, 0.5);
+
+      this.sprites.add(this.redSprite);
+      this.sprites.add(this.blueSprite);
+
+      this.leftSprite = this.game.add.sprite(0,0, left);
+      this.rightSprite = this.game.add.sprite(31,0, right);
+      this.topSprite = this.game.add.sprite(0,0, top);
+      this.bottomSprite = this.game.add.sprite(0,31, bottom);
+
+      this.leftSprite.visible = false;
+      this.rightSprite.visible = false;
+      this.topSprite.visible = false;
+      this.bottomSprite.visible = false;
+
+
+      this.cursors = this.game.input.keyboard.createCursorKeys();
+
+      this.countdownText = this.game.add.bitmapText(13,10,'minecraftia','',8);
+      this.countdownText.alpha = 0;
+      this.showCountdown = true;
+    },
+    update: function() {
+      if (!this.gameover) {
+        if(!this.showCountdown && (this.cursors.right.isDown || this.cursors.left.isDown)) {
+          this.angleMultiplier = Math.floor(Math.abs((Math.abs(this.angleStart) - Math.abs(this.angle) ) / (Math.PI)));
+          if(this.angleMultiplier > this.multiplier) {
+            this.multiplier = this.angleMultiplier;
+          }
+          
+        } else {
+            this.angleMultiplier = 0;
+            this.angleStart = this.angle;
+        }
+        
+        if(this.cursors.right.isDown) {
+          this.angle += 0.065;
+        } else if(this.cursors.left.isDown) {
+          this.angle -= 0.065;
+        }
+        
+      }
+      this.updateMultiplierDisplay();
+
 
       this.blueSprite.x = this.cx + this.radius * Math.cos(this.angle);
       this.blueSprite.y = this.cy + this.radius * Math.sin(this.angle);
+
       this.redSprite.x = this.cx - this.radius * Math.cos(this.angle);
       this.redSprite.y = this.cy - this.radius * Math.sin(this.angle);
 
+      if(this.showCountdown && this.countdownTimer < this.game.time.now) {
+        this.countdownText.text = this.countdown;
+        this.countdownTimer = this.game.time.now + this.obstacleRate * 2;
+        this.game.add.tween(this.countdownText).to({alpha:1}, this.obstacleRate)
+        .to({alpha:0}, this.obstacleRate)
+        .start();
+        this.countdown--;
+        if (this.countdown <= 0) {
+          this.showCountdown = false;
+          this.obstacleTimer = this.game.time.now + this.obstacleRate * 2;
+          this.angleStart = this.angle;
+        }
+      } else if(this.obstacleTimer < this.game.time.now) {
+        this.generateObstacle();
+        this.obstacleTimer = this.game.time.now + this.obstacleRate;
+      }
 
-      if(this.started) {
-        if(this.obstacleTimer < this.game.time.now) {
-          this.generateObstacle();
-          this.obstacleTimer = this.game.time.now + this.obstacleRate;
-        }
-        this.game.physics.arcade.overlap(this.sprites, this.obstacles, this.obstacleHit, null, this);
-      } else if((this.cursors.right.isDown || this.cursors.left.isDown) && !this.showCountdown) {
-          this.titleTween.onLoop.add(function() {
-            this.titleTween.stop();
-            if(this.titleText.alpha || this.scoreText.alpha) {
-              var text = this.titleText.alpha ? this.titleText : this.scoreText
-              this.game.add.tween(text).to({alpha:0}, this.obstacleRate, Phaser.Easing.Linear.NONE,true).onComplete.add(function(){
-                this.showCountdown = true;
-              }, this);
-            } else {
-              this.showCountdown = true;
-            }
-        }, this);
-      } else if (this.showCountdown && this.countdowTimer < this.game.time.now) {
-        if(this.countdown <= 0) {
-          this.started = true;
-          this.score = 0;
-          this.countdownText.alpha = 0;
-        } else {
-          this.countdownTimer = this.game.time.now + this.obstacleRate * 2;  
-          this.countdownText.text = this.countdown;
-          this.game.add.tween(this.countdownText).to({alpha: 1}, this.obstacleRate, Phaser.Easing.Linear.NONE, true, 0, 0, true);
-          this.countdown--;
-        }
-     }
-    }
-  },
-  generateObstacle: function() {
+      this.game.physics.arcade.overlap(this.sprites, this.obstacles, this.obstacleHit, null, this);
+
+    },
+    generateObstacle: function() {
 
     var obstacleConstructor;
     if(Phaser.Math.chanceRoll(0)) {
@@ -341,65 +684,100 @@ Menu.prototype = {
     }
     obstacle.revive();
     obstacle.events.onKilled.addOnce(function() {
-        console.log('scored');
         this.score++; 
+        this.updateScoreDisplay();
     }, this);
   },
   obstacleHit: function() {
     this.obstacles.callAll('stop');
     this.obstacleTimer = Number.MAX_VALUE;
     this.gameover = true;
-    this.scoreText.text = 'score:\n' + this.score;
+    
     this.game.add.tween(this.obstacles).to({alpha:0}, this.obstacleRate, Phaser.Easing.Linear.NONE, true);
-    this.game.add.tween(this.sprites).to({alpha:0}, this.obstacleRate, Phaser.Easing.Linear.NONE, true);
-    this.game.add.tween(this.scoreText).to({alpha:1}, this.obstacleRate*2, Phaser.Easing.Linear.NONE, true, this.obstacleRate*2).onComplete.addOnce(function() {
-      this.started = false;
-      this.showCountdown = false;
-      this.gameover = false;
-      this.countodwn = 3;
-      this.game.add.tween(this.sprites).to({alpha:1}, this.obstacleRate, Phaser.Easing.Linear.NONE, true);
-      this.titleTween = this.game.add.tween(this.scoreText).to({alpha: 0.25}, this.obstacleRate*2, Phaser.Easing.Linear.NONE, true, this.obstacleRate*2, Infinity, true);
-      this.redSprite.angle = 0;
-      this.blueSprite.angle = 0;
-
+    this.game.add.tween(this.sprites).to({alpha:0}, this.obstacleRate, Phaser.Easing.Linear.NONE, true).onComplete.addOnce(function() {
+      this.game.state.start('gameover', true,false, this.score, this.multiplier);
     }, this);
+    
   },
-  render: function() {
-    
-    
-  }
-};
+  shutdown: function() {
+    this.showCountdown = false;
+    this.countodwn = 3;
+    this.sprites.destroy();
+    this.obstacles.destroy();
+  },
+  updateScoreDisplay: function() {
+    this.scoreBMD.clear();
+    var ctx = this.scoreBMD.ctx;
+    var padding = 1;
+    var i;
+    var cols = 0;
+    var rows = 0;
+    ctx.fillStyle = '#ccc';
+    var total = this.score;
+    var denoms = Object.keys(this.scoreColors);
+    var blocks = 0;
+    denoms.sort(function(a,b) {
+      return a + b;
+    });
+    denoms.forEach(function(c) {
+      if(total >= c) {
+        ctx.fillStyle = this.scoreColors[c];
+        for(i = 0; i < Math.floor(total / c); i++) {
+          var x = cols + (cols * padding);
+          var y = rows + (rows * padding);
+          ctx.fillRect(x, y, 1,1);
+          cols++;
+          blocks++;
+          if(blocks % 4 === 0) {
+            cols = 0;
+            rows++;
+          }
+        }
+        total = total % c;
+      }
+    }, this);
 
-module.exports = Menu;
+    this.scoreBMD.render();
+    this.scoreBMD.refreshBuffer();
 
-},{"../prefabs/horizontalObstacle":2,"../prefabs/primative":3,"../prefabs/verticalObstacle":4}],8:[function(require,module,exports){
+  },
 
-  'use strict';
-  function Play() {}
-  Play.prototype = {
-    create: function() {
-      this.game.physics.startSystem(Phaser.Physics.ARCADE);
-      this.sprite = this.game.add.sprite(this.game.width/2, this.game.height/2, 'yeoman');
-      this.sprite.inputEnabled = true;
-      
-      this.game.physics.arcade.enable(this.sprite);
-      this.sprite.body.collideWorldBounds = true;
-      this.sprite.body.bounce.setTo(1,1);
-      this.sprite.body.velocity.x = this.game.rnd.integerInRange(-500,500);
-      this.sprite.body.velocity.y = this.game.rnd.integerInRange(-500,500);
+  updateMultiplierDisplay: function() {
+    var radiusMultiplier = 4;
+    var localMult = 0;
+    var localAngleMult = 0;
 
-      this.sprite.events.onInputDown.add(this.clickListener, this);
-    },
-    update: function() {
+    localMult = this.multiplier;
 
-    },
-    clickListener: function() {
-      this.game.state.start('gameover');
+
+    if(localMult > 5) {
+      localMult = 5;
     }
-  };
+    localAngleMult = this.angleMultiplier;
+    if(localAngleMult > 5) {
+      localAngleMult = 5;
+    }
+    var ctx = this.multiplierBMD.ctx;
+    this.multiplierBMD.clear();
+    
+
+    ctx.fillStyle = this.multiplierColors[localAngleMult];
+    ctx.beginPath();
+    ctx.arc(16,16,this.angleMultiplier * radiusMultiplier, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.closePath();
+
+    ctx.strokeStyle = this.multiplierColors[localMult];
+    ctx.beginPath();
+    ctx.arc(16,16,this.multiplier * radiusMultiplier, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.closePath();
+  }
+
+};
   
   module.exports = Play;
-},{}],9:[function(require,module,exports){
+},{"../prefabs/horizontalObstacle":2,"../prefabs/primative":3,"../prefabs/verticalObstacle":4}],9:[function(require,module,exports){
 'use strict';
 function Preload() {
   this.asset = null;
@@ -412,6 +790,8 @@ Preload.prototype = {
 
     this.load.onLoadComplete.addOnce(this.onLoadComplete, this);
     this.load.bitmapFont('minecraftia', 'assets/fonts/minecraftia.png', 'assets/fonts/minecraftia.xml');
+    this.load.bitmapFont('minecraftia-dark', 'assets/fonts/minecraftia-dark.png', 'assets/fonts/minecraftia-dark.fnt');
+    this.load.bitmapFont('pixel', 'assets/fonts/pixel-7.png', 'assets/fonts/pixel-7.fnt');
     this.load.audio('hit', 'assets/hit.wav');
     this.load.audio('music', ['assets/dream-culture.mp3','assets/dream-culture.ogg']);
 

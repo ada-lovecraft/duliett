@@ -11,7 +11,7 @@ var ifaces = os.networkInterfaces();
 // Mix in non-conflict functions to Underscore namespace if you want
 _.mixin(_.str.exports());
 
-var LIVERELOAD_PORT = 35729;
+var LIVERELOAD_PORT = 35739;
 var lrSnippet = require('connect-livereload')({port: LIVERELOAD_PORT});
 var mountFolder = function (connect, dir) {
   return connect.static(require('path').resolve(dir));
@@ -40,7 +40,7 @@ module.exports = function (grunt) {
     },
     connect: {
       options: {
-        port: 9000,
+        port: 9001,
         hostname: '0.0.0.0'
       },
       livereload: {
@@ -56,10 +56,10 @@ module.exports = function (grunt) {
     },
     open: {
       server: {
-        path: 'http://localhost:9000'
+        path: 'http://localhost:9001'
       },
       cocoon: {
-        path: 'http://localhost:9000/cocoon/index.html'
+        path: 'http://localhost:9001/cocoon/index.html'
       },
 
     },

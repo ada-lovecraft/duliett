@@ -10,6 +10,8 @@ Preload.prototype = {
 
     this.load.onLoadComplete.addOnce(this.onLoadComplete, this);
     this.load.bitmapFont('minecraftia', 'assets/fonts/minecraftia.png', 'assets/fonts/minecraftia.xml');
+    this.load.bitmapFont('minecraftia-dark', 'assets/fonts/minecraftia-dark.png', 'assets/fonts/minecraftia-dark.fnt');
+    this.load.bitmapFont('pixel', 'assets/fonts/pixel-7.png', 'assets/fonts/pixel-7.fnt');
     this.load.audio('hit', 'assets/hit.wav');
     this.load.audio('music', ['assets/dream-culture.mp3','assets/dream-culture.ogg']);
 
