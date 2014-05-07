@@ -134,7 +134,7 @@
         }
         
       }
-      this.updateMultiplierDisplay();
+      //this.updateMultiplierDisplay();
 
 
       this.blueSprite.x = this.cx + this.radius * Math.cos(this.angle);
@@ -212,13 +212,26 @@
     var i;
     var cols = 0;
     var rows = 0;
+    var padding = 1;
     ctx.fillStyle = '#ccc';
     var total = this.score;
     var denoms = Object.keys(this.scoreColors);
     var blocks = 0;
-    denoms.sort(function(a,b) {
-      return a + b;
+    function compare (a,b) {
+      if (a < b) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+    
+    
+    denoms.forEach(function(denom,index) {
+      denoms[index] = parseInt(denom);
     });
+    
+    denoms.sort(compare);
+    
     denoms.forEach(function(c) {
       if(total >= c) {
         ctx.fillStyle = this.scoreColors[c];

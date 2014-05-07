@@ -242,22 +242,17 @@ GameOver.prototype = {
     
 
     
-    this.scoreSprites = this.game.add.group();
+    this.scoreBMD = this.game.add.bitmapData(this.game.width, this.game.height);
     
-    
-    
-    this.scoreDisplayText = this.game.add.bitmapText(2,2,'minecraftia-dark','' + this.scoreDisplay,8);
-    this.scoreDisplayText.align = 'center';
-    this.scoreDisplayText.alpha = 0;
-    this.multiplierDisplayText = this.game.add.bitmapText(2,12,'minecraftia-dark','',8);
-    this.multiplierDisplayText.align = 'center';
-    this.scoreText = this.game.add.bitmapText(2,22,'minecraftia-dark','',8);
+    this.scoreText = this.game.add.bitmapText(0,4,'minecraftia','score:\n'+this.score,8);
     this.scoreText.align = 'center';
-    this.scoreText.alpha = 0;
 
-    this.scoreFinalText = this.game.add.bitmapText(0,4,'minecraftia','' + this.scoreDisplay,8);
-    this.scoreFinalText.align = 'center';
-    this.scoreFinalText.alpha = 0;
+    this.scoreboard = this.game.add.sprite(0,0, this.scoreBMD);
+
+    this.scoreGroup = this.game.add.group();
+    this.scoreGroup.add(this.scoreText);
+    this.scoreGroup.add(this.scoreboard);
+    this.scoreGroup.alpha = 0;
 
     this.sprites = this.game.add.group();
     this.redSprite = this.game.add.sprite(16,16, red);
@@ -286,8 +281,9 @@ GameOver.prototype = {
         this.restarting = true;
         this.scoreTween.onLoop.addOnce(function() {
           this.scoreTween.stop();
-          if(this.scoreFinalText.alpha) {
-            var tween = this.game.add.tween(this.scoreFinalText).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
+          if(this.scoreGroup.alpha) {
+            this.game.add.tween(this.scoreGroup).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
+            var tween = this.game.add.tween(this.scoreGroup).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
             tween.start();
             tween.onComplete.add(function() {
               this.game.state.start('play', true, false, this.angle);
@@ -319,57 +315,54 @@ GameOver.prototype = {
   },
 
   showScore: function() {
-    var total = this.score;
-    var denoms = Object.keys(this.scoreColors);
-    var blocks = 0;
-    var color = null;
-    var width = 4;
-    var height = 4;
-    var i;
-    var cols = 0;
-    var rows = 0;
-    var totalBlocks = 0;
-    var maxBlocksPerRow = 4;
-    denoms.sort(function(a,b) {
-      return a + b;
+    var total = this.score,
+        denoms = Object.keys(this.scoreColors),
+        blocks = 0,
+        color = null,
+        width = 2,
+        height = 4,
+        i,
+        cols = 0,
+        rows = 0,
+        totalBlocks = 0,
+        padding = 2,
+        maxBlocksPerRow = 8,
+        ctx = this.scoreBMD.ctx;
+    
+    function compare (a,b) {
+      if (a < b) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+    denoms.forEach(function(denom,index) {
+      denoms[index] = parseInt(denom);
     });
 
+    denoms.sort(compare);
     // count total blocks
-    denoms.forEach(function(c) {
-      if(total >= c) {
-        color = this.scoreColors[c];
-        for(i = 0; i < Math.floor(total / c); i++) {
-          totalBlocks++;
-        }
-        total = total % c;
-      }
-    }, this);
+    
+    
+    /*
     // add a block for the multiplier
     totalBlocks++;
     var d = totalBlocks > maxBlocksPerRow ? maxBlocksPerRow : totalBlocks;
     width = Math.ceil(32 / d);
     width = width || 32;
     height = Math.ceil(32 / Math.ceil(totalBlocks / maxBlocksPerRow));
-
-    // reset total
-    total = this.score;
+    */
 
     denoms.forEach(function(c) {
       if(total >= c) {
-        color = this.scoreColors[c];
+        ctx.fillStyle = this.scoreColors[c];
         for(i = 0; i < Math.floor(total / c); i++) {
-          var x = cols * width;
-          var y = rows * height;
-          var scoreSprite = this.game.make.sprite(-width,y,new Primative.createPrimative(this.game, width, height, color));
-          this.game.add.tween(scoreSprite).to({x: x}, this.obstacleRate, Phaser.Easing.Bounce.Out, true, blocks * this.obstacleRate).onComplete.add(function() {
-            this.scoreDisplay += parseInt(c);
-            this.scoreDisplayText.text = this.scoreDisplay;
-            this.scoreDisplayText.alpha = 1;
-          }, this);
-          this.scoreSprites.add(scoreSprite);
+          var x = cols + (cols * padding) + padding;
+          var y = rows + (rows * padding) + padding;
+          ctx.fillRect(x, y, width,width);
           cols++;
           blocks++;
-          if(blocks % 4 === 0) {
+          if(blocks % maxBlocksPerRow === 0) {
             cols = 0;
             rows++;
           }
@@ -378,34 +371,21 @@ GameOver.prototype = {
       }
     }, this);
     
-    var localMult = this.multiplier > 4 ? 4 : this.multiplier;
-    var x = cols * width;
-    var y = rows * height;
-    var scoreSprite = this.game.make.sprite(- 32 - (width * cols),y,new Primative.createPrimative(this.game, 32 - (width * cols), height, this.multiplierColors[localMult]));
-    this.game.add.tween(scoreSprite).to({x: x}, this.obstacleRate, Phaser.Easing.Bounce.Out, true, blocks * this.obstacleRate).onComplete.add(function() {
-      this.multiplierDisplayText.text = 'x' + this.multiplier;
-      this.scoreText.text = this.scoreDisplay * this.multiplier;
-      this.scoreFinalText.text = 'score:\n' + this.scoreDisplay * this.multiplier;
-      
-    }, this);
-
-    blocks++;
-    blocks++;
-    this.game.add.tween(this.scoreText).to({alpha: 1}, this.obstacleRate, Phaser.Easing.Linear.NONE, true, blocks * this.obstacleRate).onComplete.add(function() {
+    this.scoreBMD.render();
+    this.scoreBMD.refreshBuffer();
+    
+    this.game.add.tween(this.scoreGroup).to({alpha: 1}, this.obstacleRate, Phaser.Easing.Linear.NONE, true).onComplete.add(function() {
       this.fade();
     }, this);
-    this.scoreSprites.add(scoreSprite);
+    this.scoreboard.x = 0;
+    this.scoreboard.y = this.scoreText.y - (rows * (width + padding) + padding);
     
   },
   fade: function() {
-    this.game.add.tween(this.scoreSprites).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE, true, this.obstacleRate);
-    this.game.add.tween(this.scoreText).to({alpha: 0}, this.obstacleRate * 2,Phaser.Easing.Linear.NONE, true, this.obstacleRate);
-    this.scoreTween = this.game.add.tween(this.scoreFinalText).to({alpha:1}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE, false, this.obstacleRate, Infinity, true);
-    this.scoreTween.start();
-    this.scoreTween.onLoop.addOnce(function() {
-      this.isReady = true;
-      this.game.add.tween(this.sprites).to({alpha: 1}, this.obstacleRate).start();
-    }, this);
+    
+    this.scoreTween = this.game.add.tween(this.scoreGroup).to({alpha: 0.25}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE, true, 0, Infinity, true);
+    this.game.add.tween(this.sprites).to({alpha: 1}, this.obstacleRate * 2).start();
+    this.isReady = true;
   }
 
 };
@@ -627,7 +607,7 @@ module.exports = Menu;
         }
         
       }
-      this.updateMultiplierDisplay();
+      //this.updateMultiplierDisplay();
 
 
       this.blueSprite.x = this.cx + this.radius * Math.cos(this.angle);
@@ -705,13 +685,26 @@ module.exports = Menu;
     var i;
     var cols = 0;
     var rows = 0;
+    var padding = 1;
     ctx.fillStyle = '#ccc';
     var total = this.score;
     var denoms = Object.keys(this.scoreColors);
     var blocks = 0;
-    denoms.sort(function(a,b) {
-      return a + b;
+    function compare (a,b) {
+      if (a < b) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+    
+    
+    denoms.forEach(function(denom,index) {
+      denoms[index] = parseInt(denom);
     });
+    
+    denoms.sort(compare);
+    
     denoms.forEach(function(c) {
       if(total >= c) {
         ctx.fillStyle = this.scoreColors[c];
