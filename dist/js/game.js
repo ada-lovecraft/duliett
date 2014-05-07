@@ -286,11 +286,11 @@ GameOver.prototype = {
             var tween = this.game.add.tween(this.scoreGroup).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
             tween.start();
             tween.onComplete.add(function() {
-              this.game.state.start('play', true, false, this.angle);
+              this.game.state.start('play', true, false, this.angle, false);
             }, this);
 
           } else {
-            this.game.state.start('play', true, false, this.angle);
+            this.game.state.start('play', true, false, this.angle, false);
           }
         }, this);
       }
@@ -515,10 +515,10 @@ module.exports = Menu;
   var VerticalObstacle = require('../prefabs/verticalObstacle');
 
   Play.prototype = {
-    init: function(angle) {
+    init: function(angle, countdown) {
       this.angle = angle || 0;
       this.started = false;
-      this.showCountdown = true;
+      this.showCountdown = typeof countdown !== 'undefined' ? countdown : true;
 
       this.countdown = 3;
       this.countdownTimer = 0;
@@ -585,7 +585,10 @@ module.exports = Menu;
 
       this.countdownText = this.game.add.bitmapText(13,10,'minecraftia','',8);
       this.countdownText.alpha = 0;
-      this.showCountdown = true;
+
+      if(!this.showCountdown) {
+        this.obstacleTimer = 0;
+      }
     },
     update: function() {
       if (!this.gameover) {

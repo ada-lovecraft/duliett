@@ -42,10 +42,10 @@
   var VerticalObstacle = require('../prefabs/verticalObstacle');
 
   Play.prototype = {
-    init: function(angle) {
+    init: function(angle, countdown) {
       this.angle = angle || 0;
       this.started = false;
-      this.showCountdown = true;
+      this.showCountdown = typeof countdown !== 'undefined' ? countdown : true;
 
       this.countdown = 3;
       this.countdownTimer = 0;
@@ -112,7 +112,10 @@
 
       this.countdownText = this.game.add.bitmapText(13,10,'minecraftia','',8);
       this.countdownText.alpha = 0;
-      this.showCountdown = true;
+
+      if(!this.showCountdown) {
+        this.obstacleTimer = 0;
+      }
     },
     update: function() {
       if (!this.gameover) {

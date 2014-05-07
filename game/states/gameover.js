@@ -97,11 +97,11 @@ GameOver.prototype = {
             var tween = this.game.add.tween(this.scoreGroup).to({alpha: 0}, this.obstacleRate * 2, Phaser.Easing.Linear.NONE);
             tween.start();
             tween.onComplete.add(function() {
-              this.game.state.start('play', true, false, this.angle);
+              this.game.state.start('play', true, false, this.angle, false);
             }, this);
 
           } else {
-            this.game.state.start('play', true, false, this.angle);
+            this.game.state.start('play', true, false, this.angle, false);
           }
         }, this);
       }
